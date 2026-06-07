@@ -3,6 +3,8 @@ import pytest
 
 # First-party
 from neural_lam.datastore.mdp import MDPDatastore
+from tests.conftest import init_datastore_example
+from tests.test_training import run_simple_training
 
 STATE_ONLY_CONFIG = (
     "tests/datastore_examples/mdp/danra_100m_winds/state_only.datastore.yaml"
@@ -38,3 +40,25 @@ def test_state_only_datastore_forcing_returns_empty():
         datastore = MDPDatastore(config_path=STATE_ONLY_CONFIG)
 
     assert datastore.get_vars_names("forcing") == []
+
+
+@pytest.mark.parametrize("missing_category", ["static", "forcing"])
+def test_state_only_datastore_all_entry_points_handle_missing(missing_category):
+    """All MDPDatastore entry points that take a category argument should
+    treat missing optional categories (static, forcing) consistently:
+    list accessors return [], get_dataarray returns None. Catches the case
+    where only get_vars_names was patched in the original PR."""
+    with pytest.warns(UserWarning):
+        datastore = MDPDatastore(config_path=STATE_ONLY_CONFIG)
+
+    assert datastore.get_vars_names(missing_category) == []
+    assert datastore.get_vars_units(missing_category) == []
+    assert datastore.get_vars_long_names(missing_category) == []
+    assert datastore.get_num_data_vars(missing_category) == 0
+    assert datastore.get_dataarray(missing_category, split="train") is None
+
+
+def test_state_only_datastore_training_setup_runs():
+    """Run the shared small training setup against the MDP datastore."""
+    datastore = init_datastore_example(MDPDatastore.SHORT_NAME)
+    run_simple_training(datastore, set_output_std=False)
